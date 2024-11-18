@@ -1,6 +1,7 @@
 ## VC Client for Docker
 
-[Japanese](/README_ja.md)
+[Japanese](./README.md) 
+[Korean](./README.md)
 
 ## Build
 

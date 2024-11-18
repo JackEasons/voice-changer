@@ -18,7 +18,7 @@ from voice_changer.RVC.inferencer.OnnxRVCInferencer import OnnxRVCInferencer
 from voice_changer.RVC.inferencer.OnnxRVCInferencerNono import OnnxRVCInferencerNono
 
 from voice_changer.RVC.pitchExtractor.PitchExtractor import PitchExtractor
-from voice_changer.utils.Timer import Timer
+from voice_changer.utils.Timer import Timer2
 
 logger = VoiceChangaerLogger.get_instance().getLogger()
 
@@ -74,6 +74,60 @@ class Pipeline(object):
     def setPitchExtractor(self, pitchExtractor: PitchExtractor):
         self.pitchExtractor = pitchExtractor
 
+    def extractPitch(self, audio_pad, if_f0, pitchf, f0_up_key, silence_front):
+        try:
+            if if_f0 == 1:
+                pitch, pitchf = self.pitchExtractor.extract(
+                    audio_pad,
+                    pitchf,
+                    f0_up_key,
+                    self.sr,
+                    self.window,
+                    silence_front=silence_front,
+                )
+                # pitch = pitch[:p_len]
+                # pitchf = pitchf[:p_len]
+                pitch = torch.tensor(pitch, device=self.device).unsqueeze(0).long()
+                pitchf = torch.tensor(pitchf, device=self.device, dtype=torch.float).unsqueeze(0)
+            else:
+                pitch = None
+                pitchf = None
+        except IndexError as e:  # NOQA
+            print(e)
+            import traceback
+            traceback.print_exc()
+            raise NotEnoughDataExtimateF0()
+        return pitch, pitchf
+
+    def extractFeatures(self, feats, embOutputLayer, useFinalProj):
+        with autocast(enabled=self.isHalf):
+            try:
+                feats = self.embedder.extractFeatures(feats, embOutputLayer, useFinalProj)
+                if torch.isnan(feats).all():
+                    raise DeviceCannotSupportHalfPrecisionException()
+                return feats
+            except RuntimeError as e:
+                if "HALF" in e.__str__().upper():
+                    raise HalfPrecisionChangingException()
+                elif "same device" in e.__str__():
+                    raise DeviceChangingException()
+                else:
+                    raise e
+                
+    def infer(self, feats, p_len, pitch, pitchf, sid, out_size):
+        try:
+            with torch.no_grad():
+                with autocast(enabled=self.isHalf):
+                    audio1 = self.inferencer.infer(feats,  p_len, pitch, pitchf, sid, out_size)                    
+                    audio1 = (audio1 * 32767.5).data.to(dtype=torch.int16)
+            return audio1
+        except RuntimeError as e:
+            if "HALF" in e.__str__().upper():
+                print("HalfPresicion Error:", e)
+                raise HalfPrecisionChangingException()
+            else:
+                raise e
+
     def exec(
         self,
         sid,
@@ -93,7 +147,7 @@ class Pipeline(object):
         # print(f"pipeline exec input, audio:{audio.shape}, pitchf:{pitchf.shape}, feature:{feature.shape}")
         # print(f"pipeline exec input, silence_front:{silence_front}, out_size:{out_size}")
 
-        with Timer("main-process", False) as t:  # NOQA
+        with Timer2("Pipeline-Exec", False) as t:  # NOQA
             # 16000のサンプリングレートで入ってきている。以降この世界は16000で処理。
             search_index = self.index is not None and self.big_npy is not None and index_rate != 0
             # self.t_pad = self.sr * repeat  # 1秒
@@ -113,30 +167,6 @@ class Pipeline(object):
             pitchf = pitchf if repeat == 0 else np.zeros(p_len)
             out_size = out_size if repeat == 0 else None
 
-            # ピッチ検出
-            try:
-                if if_f0 == 1:
-                    pitch, pitchf = self.pitchExtractor.extract(
-                        audio_pad,
-                        pitchf,
-                        f0_up_key,
-                        self.sr,
-                        self.window,
-                        silence_front=silence_front,
-                    )
-                    # pitch = pitch[:p_len]
-                    # pitchf = pitchf[:p_len]
-                    pitch = torch.tensor(pitch, device=self.device).unsqueeze(0).long()
-                    pitchf = torch.tensor(pitchf, device=self.device, dtype=torch.float).unsqueeze(0)
-                else:
-                    pitch = None
-                    pitchf = None
-            except IndexError as e:  # NOQA
-                # print(e)
-                # import traceback
-                # traceback.print_exc()
-                raise NotEnoughDataExtimateF0()
-
             # tensor型調整
             feats = audio_pad
             if feats.dim() == 2:  # double channels
@@ -144,21 +174,14 @@ class Pipeline(object):
             assert feats.dim() == 1, feats.dim()
             feats = feats.view(1, -1)
 
+            t.record("pre-process")
+            # ピッチ検出
+            pitch, pitchf = self.extractPitch(audio_pad, if_f0, pitchf, f0_up_key, silence_front)
+            t.record("extract-pitch")
+
             # embedding
-            with Timer("main-process", False) as te:
-                with autocast(enabled=self.isHalf):
-                    try:
-                        feats = self.embedder.extractFeatures(feats, embOutputLayer, useFinalProj)
-                        if torch.isnan(feats).all():
-                            raise DeviceCannotSupportHalfPrecisionException()
-                    except RuntimeError as e:
-                        if "HALF" in e.__str__().upper():
-                            raise HalfPrecisionChangingException()
-                        elif "same device" in e.__str__():
-                            raise DeviceChangingException()
-                        else:
-                            raise e
-            # print(f"[Embedding] {te.secs}")
+            feats = self.extractFeatures(feats, embOutputLayer, useFinalProj)
+            t.record("extract-feats")
 
             # Index - feature抽出
             # if self.index is not None and self.feature is not None and index_rate != 0:
@@ -226,27 +249,12 @@ class Pipeline(object):
                 pitchf = pitchf[:, -feats_len:]
             p_len = torch.tensor([feats_len], device=self.device).long()
 
+            t.record("mid-precess")
             # 推論実行
-            try:
-                with torch.no_grad():
-                    with autocast(enabled=self.isHalf):
-                        audio1 = (
-                            torch.clip(
-                                self.inferencer.infer(feats, p_len, pitch, pitchf, sid, out_size)[0][0, 0].to(dtype=torch.float32),
-                                -1.0,
-                                1.0,
-                            )
-                            * 32767.5
-                        ).data.to(dtype=torch.int16)
-            except RuntimeError as e:
-                if "HALF" in e.__str__().upper():
-                    print("11", e)
-                    raise HalfPrecisionChangingException()
-                else:
-                    raise e
+            audio1 = self.infer(feats, p_len, pitch, pitchf, sid, out_size)
+            t.record("infer")
 
             feats_buffer = feats.squeeze(0).detach().cpu()
-
             if pitchf is not None:
                 pitchf_buffer = pitchf.squeeze(0).detach().cpu()
             else:
@@ -263,6 +271,7 @@ class Pipeline(object):
                 audio1 = audio1[offset:end]
 
             del sid
+            t.record("post-process")
             # torch.cuda.empty_cache()
         # print("EXEC AVERAGE:", t.avrSecs)
         return audio1, pitchf_buffer, feats_buffer

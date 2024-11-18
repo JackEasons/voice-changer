@@ -1,6 +1,6 @@
-# Realtime Voice Changer Client for RVC チュートリアル(v.1.5.3.10)
+# Realtime Voice Changer Client for RVC チュートリアル(v.1.5.3.13)
 
-[English](/tutorials/tutorial_rvc_en_latest.md)
+[English](/tutorials/tutorial_rvc_en_latest.md) [Korean/한국어](/tutorials/tutorial_rvc_ko_latest.md)
 
 # はじめに
 
@@ -126,7 +126,7 @@ A7. フォルダのパスに unicode が含まれるとエラーが出るよう�
 | <img src="https://github.com/w-okada/rvc-trainer-docker/assets/48346627/7bc188db-3aae-43eb-98a1-34aacc16173d" width="32"> スパナ             | 各種便利ツールへのリンク         |
 | <img src="https://github.com/w-okada/rvc-trainer-docker/assets/48346627/5db16acc-e901-40d2-8fc2-1fb9fd67f59c" width="32"> コーヒー           | 開発者へ**寄付**するためのリンク |
 
-### claer setting
+### clear setting
 
 設定を初期化します。
 
@@ -140,7 +140,7 @@ A7. フォルダのパスに unicode が含まれるとエラーが出るよう�
 
 ## メインコントロールエリア
 
-![image](https://github.com/w-okada/voice-changer/assets/48346627/5a8dcf64-29d3-49cd-92f1-db7b539bfb3d)
+![image](https://github.com/w-okada/voice-changer/assets/48346627/4401acdb-eb58-40e1-9609-5a82ee5eb570)
 
 左側にロードされたモデルのキャラクタ画像が表示されます。キャラクタ画像の左上にリアルタイム変換の状況がオーバレイ表示されます。
 
@@ -169,6 +169,10 @@ CHUNK と EXTRA を足したデータを変換にかかる時間です。CHUNK �
 #### start/stop ボタン
 
 start で音声変換を開始、stop で音声変換を停止します
+
+#### pass through ボタン
+
+音声を変換せずにそのまま出力します。デフォルトでは有効時に確認ダイアログが表示されますが、Advanced Setting で確認ダイアログをスキップする設定ができます。
 
 #### GAIN
 
@@ -253,12 +257,24 @@ onnxgpu 版では使用する GPU を選択することができます。
 
 onnxdirectML 版では GPU の ON/OFF を切り替えることができます。
 
+DirectML Version の場合は次のようなボタンが表示されます。
+
+![image](https://github.com/w-okada/voice-changer/assets/48346627/5a66f237-e5b5-4819-9409-ff5eebb6e514)
+
+- cpu: cpu を使用します。
+- gpu0: gpu0 を使用します
+- gpu1: gpu1 を使用します
+- gpu2: gpu2 を使用します
+- gpu3: gpu3 を使用します
+
+gpu0 - gpu3 は GPU が検出されなくても表示されます。存在しない GPU を指定した場合は CPU が使用されます。[詳細](https://github.com/w-okada/voice-changer/issues/410)
+
 #### AUDIO
 
-使用するオーディオデバイスのタイプを選びます。詳細は[こちらの文書](./tutorial_device_mode.md)をご確認ください。
+使用するオーディオデバイスのタイプを選びます。詳細は[こちらの文書](./tutorial_device_mode_ja.md)をご確認ください。
 
 - client: ノイズ抑制機能など GUI(chrome)の機能を活用してマイク入力、スピーカー出力を行うことができます。
-- server: VCClient が直接マイクとスピーカーを操作します。遅延を抑えることができます。
+- server: VC Client が直接マイクとスピーカーを操作します。遅延を抑えることができます。
 
 #### input
 

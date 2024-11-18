@@ -11,8 +11,13 @@ VoiceChangerType: TypeAlias = Literal[
     "so-vits-svc-40",
     "DDSP-SVC",
     "RVC",
-    "Diffusion-SVC"
+    "Diffusion-SVC",
+    "Beatrice",
+    "LLVC",
+    "EasyVC",
 ]
+
+StaticSlot: TypeAlias = Literal["Beatrice-JVS",]
 
 STORED_SETTING_FILE = "stored_setting.json"
 
@@ -22,6 +27,8 @@ tmpdir = tempfile.TemporaryDirectory()
 SSL_KEY_DIR = os.path.join(tmpdir.name, "keys") if hasattr(sys, "_MEIPASS") else "keys"
 MODEL_DIR = os.path.join(tmpdir.name, "logs") if hasattr(sys, "_MEIPASS") else "logs"
 UPLOAD_DIR = os.path.join(tmpdir.name, "upload_dir") if hasattr(sys, "_MEIPASS") else "upload_dir"
+UPLOAD_DIR = os.path.join(tmpdir.name, "upload_dir") if hasattr(sys, "_MEIPASS") else "upload_dir"
+
 NATIVE_CLIENT_FILE_WIN = os.path.join(sys._MEIPASS, "voice-changer-native-client.exe") if hasattr(sys, "_MEIPASS") else "voice-changer-native-client"  # type: ignore
 NATIVE_CLIENT_FILE_MAC = (
     os.path.join(
@@ -34,6 +41,9 @@ NATIVE_CLIENT_FILE_MAC = (
     if hasattr(sys, "_MEIPASS")
     else "voice-changer-native-client"
 )
+
+MODEL_DIR_STATIC = os.path.join(sys._MEIPASS, "model_dir_static") if hasattr(sys, "_MEIPASS") else "model_dir_static"
+
 
 HUBERT_ONNX_MODEL_PATH = os.path.join(sys._MEIPASS, "model_hubert/hubert_simple.onnx") if hasattr(sys, "_MEIPASS") else "model_hubert/hubert_simple.onnx"  # type: ignore
 
@@ -50,7 +60,8 @@ def getFrontendPath():
 EmbedderType: TypeAlias = Literal[
     "hubert_base",
     "contentvec",
-    "hubert-base-japanese"
+    "hubert-base-japanese",
+    "whisper",
 ]
 
 
@@ -65,10 +76,10 @@ class EnumInferenceTypes(Enum):
     onnxRVC = "onnxRVC"
     onnxRVCNono = "onnxRVCNono"
 
+    easyVC = "easyVC"
 
-DiffusionSVCInferenceType: TypeAlias = Literal[
-    "combo",
-]
+
+DiffusionSVCInferenceType: TypeAlias = Literal["combo",]
 
 
 PitchExtractorType: TypeAlias = Literal[
@@ -78,12 +89,11 @@ PitchExtractorType: TypeAlias = Literal[
     "crepe_full",
     "crepe_tiny",
     "rmvpe",
+    "rmvpe_onnx",
+    "fcpe",
 ]
 
-ServerAudioDeviceType: TypeAlias = Literal[
-    "audioinput",
-    "audiooutput"
-]
+ServerAudioDeviceType: TypeAlias = Literal["audioinput", "audiooutput"]
 
 RVCSampleMode: TypeAlias = Literal[
     "production",
@@ -97,18 +107,50 @@ RVCSampleMode: TypeAlias = Literal[
 def getSampleJsonAndModelIds(mode: RVCSampleMode):
     if mode == "production":
         return [
-            # "https://huggingface.co/wok000/vcclient_model/raw/main/samples_0001.json",
-            # "https://huggingface.co/wok000/vcclient_model/raw/main/samples_0002.json",
-            "https://huggingface.co/wok000/vcclient_model/raw/main/samples_0003_t2.json",
-            "https://huggingface.co/wok000/vcclient_model/raw/main/samples_0003_o2.json",
-            "https://huggingface.co/wok000/vcclient_model/raw/main/samples_0003_d2.json",
+            "https://huggingface.co/wok000/vcclient_model/raw/main/samples_0004_t.json",
+            "https://huggingface.co/wok000/vcclient_model/raw/main/samples_0004_o.json",
+            "https://huggingface.co/wok000/vcclient_model/raw/main/samples_0004_d.json",
         ], [
             ("Tsukuyomi-chan_o", {"useIndex": False}),
             ("Amitaro_o", {"useIndex": False}),
             ("KikotoMahiro_o", {"useIndex": False}),
-            ("TokinaShigure_o", {"useIndex": True}),
-            ("diffusion_combo_spk5_nl3_dl20_k50_500ep", {}),
-            ("diffusion_combo_spk5_nl3_dl1_k50_500ep", {}),
+            ("TokinaShigure_o", {"useIndex": False}),
+        ]
+    elif mode == "testAll":
+        return [
+            "https://huggingface.co/wok000/vcclient_model/raw/main/test/test_official_v1_v2.json",
+            "https://huggingface.co/wok000/vcclient_model/raw/main/test/test_ddpn_v1_v2.json",
+        ], [
+            ("test-official-v1-f0-48k-l9-hubert_t", {"useIndex": True}),
+            ("test-official-v1-nof0-48k-l9-hubert_t", {"useIndex": False}),
+            ("test-official-v2-f0-40k-l12-hubert_t", {"useIndex": False}),
+            ("test-official-v2-nof0-40k-l12-hubert_t", {"useIndex": False}),
+            ("test-official-v1-f0-48k-l9-hubert_o", {"useIndex": True}),
+            ("test-official-v1-nof0-48k-l9-hubert_o", {"useIndex": False}),
+            ("test-official-v2-f0-40k-l12-hubert_o", {"useIndex": False}),
+            ("test-official-v2-nof0-40k-l12-hubert_o", {"useIndex": False}),
+            ("test-ddpn-v1-f0-48k-l9-hubert_t", {"useIndex": False}),
+            ("test-ddpn-v1-nof0-48k-l9-hubert_t", {"useIndex": False}),
+            ("test-ddpn-v2-f0-40k-l12-hubert_t", {"useIndex": False}),
+            ("test-ddpn-v2-nof0-40k-l12-hubert_t", {"useIndex": False}),
+            ("test-ddpn-v2-f0-40k-l12-hubert_jp_t", {"useIndex": False}),
+            ("test-ddpn-v2-nof0-40k-l12-hubert_jp_t", {"useIndex": False}),
+            ("test-ddpn-v1-f0-48k-l9-hubert_o", {"useIndex": False}),
+            ("test-ddpn-v1-nof0-48k-l9-hubert_o", {"useIndex": False}),
+            ("test-ddpn-v2-f0-40k-l12-hubert_o", {"useIndex": False}),
+            ("test-ddpn-v2-nof0-40k-l12-hubert_o", {"useIndex": False}),
+            ("test-ddpn-v2-f0-40k-l12-hubert_jp_o", {"useIndex": False}),
+            ("test-ddpn-v2-nof0-40k-l12-hubert_jp_o", {"useIndex": False}),
+            ("test-official-v1-f0-48k-l9-hubert_o_full", {"useIndex": False}),
+            ("test-official-v1-nof0-48k-l9-hubert_o_full", {"useIndex": False}),
+            ("test-official-v2-f0-40k-l12-hubert_o_full", {"useIndex": False}),
+            ("test-official-v2-nof0-40k-l12-hubert_o_full", {"useIndex": False}),
+            ("test-ddpn-v1-f0-48k-l9-hubert_o_full", {"useIndex": False}),
+            ("test-ddpn-v1-nof0-48k-l9-hubert_o_full", {"useIndex": False}),
+            ("test-ddpn-v2-f0-40k-l12-hubert_o_full", {"useIndex": False}),
+            ("test-ddpn-v2-nof0-40k-l12-hubert_o_full", {"useIndex": False}),
+            ("test-ddpn-v2-f0-40k-l12-hubert_jp_o_full", {"useIndex": False}),
+            ("test-ddpn-v2-nof0-40k-l12-hubert_jp_o_full", {"useIndex": False}),
         ]
     elif mode == "testOfficial":
         return [
@@ -169,4 +211,4 @@ def getSampleJsonAndModelIds(mode: RVCSampleMode):
 
 
 RVC_MODEL_DIRNAME = "rvc"
-MAX_SLOT_NUM = 200
+MAX_SLOT_NUM = 500

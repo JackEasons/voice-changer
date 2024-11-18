@@ -1,19 +1,22 @@
 import os
 import sys
 
+from restapi.mods.trustedorigin import TrustedOriginMiddleware
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.routing import APIRoute
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
-from typing import Callable
+from typing import Callable, Optional, Sequence, Literal
+from mods.log_control import VoiceChangaerLogger
 from voice_changer.VoiceChangerManager import VoiceChangerManager
 
 from restapi.MMVC_Rest_Hello import MMVC_Rest_Hello
 from restapi.MMVC_Rest_VoiceChanger import MMVC_Rest_VoiceChanger
 from restapi.MMVC_Rest_Fileuploader import MMVC_Rest_Fileuploader
-from const import UPLOAD_DIR, getFrontendPath, TMP_DIR
+from const import MODEL_DIR_STATIC, UPLOAD_DIR, getFrontendPath, TMP_DIR
 from voice_changer.utils.VoiceChangerParams import VoiceChangerParams
+
+logger = VoiceChangaerLogger.get_instance().getLogger()
 
 
 class ValidationErrorLoggingRoute(APIRoute):
@@ -40,16 +43,17 @@ class MMVC_Rest:
         cls,
         voiceChangerManager: VoiceChangerManager,
         voiceChangerParams: VoiceChangerParams,
+        allowedOrigins: Optional[Sequence[str]] = None,
+        port: Optional[int] = None,
     ):
         if cls._instance is None:
+            logger.info("[Voice Changer] MMVC_Rest initializing...")
             app_fastapi = FastAPI()
             app_fastapi.router.route_class = ValidationErrorLoggingRoute
             app_fastapi.add_middleware(
-                CORSMiddleware,
-                allow_origins=["*"],
-                allow_credentials=True,
-                allow_methods=["*"],
-                allow_headers=["*"],
+                TrustedOriginMiddleware,
+                allowed_origins=allowedOrigins,
+                port=port
             )
 
             app_fastapi.mount(
@@ -69,12 +73,12 @@ class MMVC_Rest:
                 StaticFiles(directory=f"{getFrontendPath()}", html=True),
                 name="static",
             )
-            app_fastapi.mount(
-                "/tmp", StaticFiles(directory=f"{TMP_DIR}"), name="static"
-            )
-            app_fastapi.mount(
-                "/upload_dir", StaticFiles(directory=f"{UPLOAD_DIR}"), name="static"
-            )
+            app_fastapi.mount("/tmp", StaticFiles(directory=f"{TMP_DIR}"), name="static")
+            app_fastapi.mount("/upload_dir", StaticFiles(directory=f"{UPLOAD_DIR}"), name="static")
+            try:
+                app_fastapi.mount("/model_dir_static", StaticFiles(directory=f"{MODEL_DIR_STATIC}"), name="static")
+            except Exception as e:
+                print("Locating model_dir_static failed", e)
 
             if sys.platform.startswith("darwin"):
                 p1 = os.path.dirname(sys._MEIPASS)
@@ -102,6 +106,7 @@ class MMVC_Rest:
             app_fastapi.include_router(fileUploader.router)
 
             cls._instance = app_fastapi
+            logger.info("[Voice Changer] MMVC_Rest initializing... done.")
             return cls._instance
 
         return cls._instance

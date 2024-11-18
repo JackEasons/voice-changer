@@ -13,7 +13,7 @@ const SortTypes = {
 export type SortTypes = (typeof SortTypes)[keyof typeof SortTypes];
 
 export const ModelSlotArea = (_props: ModelSlotAreaProps) => {
-    const { serverSetting, getInfo } = useAppState();
+    const { serverSetting, getInfo, webEdition } = useAppState();
     const guiState = useGuiState();
     const messageBuilderState = useMessageBuilder();
     const [sortType, setSortType] = useState<SortTypes>("slot");
@@ -41,10 +41,14 @@ export const ModelSlotArea = (_props: ModelSlotAreaProps) => {
                 const tileContainerClass = x.slotIndex == serverSetting.serverSetting.modelSlotIndex ? "model-slot-tile-container-selected" : "model-slot-tile-container";
                 const name = x.name.length > 8 ? x.name.substring(0, 7) + "..." : x.name;
 
+                const modelDir = x.slotIndex == "Beatrice-JVS" ? "model_dir_static" : serverSetting.serverSetting.voiceChangerParams.model_dir;
+                const icon = x.iconFile.length > 0 ? modelDir + "/" + x.slotIndex + "/" + x.iconFile.split(/[\/\\]/).pop() : "./assets/icons/human.png";
+
                 const iconElem =
                     x.iconFile.length > 0 ? (
                         <>
-                            <img className="model-slot-tile-icon" src={serverSetting.serverSetting.voiceChangerParams.model_dir + "/" + x.slotIndex + "/" + x.iconFile.split(/[\/\\]/).pop()} alt={x.name} />
+                            {/* <img className="model-slot-tile-icon" src={serverSetting.serverSetting.voiceChangerParams.model_dir + "/" + x.slotIndex + "/" + x.iconFile.split(/[\/\\]/).pop()} alt={x.name} /> */}
+                            <img className="model-slot-tile-icon" src={icon} alt={x.name} />
                             <div className="model-slot-tile-vctype">{x.voiceChangerType}</div>
                         </>
                     ) : (
@@ -55,6 +59,7 @@ export const ModelSlotArea = (_props: ModelSlotAreaProps) => {
                     );
 
                 const clickAction = async () => {
+                    // @ts-ignore
                     const dummyModelSlotIndex = Math.floor(Date.now() / 1000) * 1000 + x.slotIndex;
                     await serverSetting.updateServerSettings({ ...serverSetting.serverSetting, modelSlotIndex: dummyModelSlotIndex });
                     setTimeout(() => {
@@ -110,6 +115,10 @@ export const ModelSlotArea = (_props: ModelSlotAreaProps) => {
             </div>
         );
     }, [modelTiles, sortType]);
+
+    if (webEdition) {
+        return <></>;
+    }
 
     return modelSlotArea;
 };

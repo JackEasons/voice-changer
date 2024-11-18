@@ -1,7 +1,8 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState, useRef } from "react";
 import { ReactNode } from "react";
 import { useAppRoot } from "../../001_provider/001_AppRootProvider";
 import { StateControlCheckbox, useStateControlCheckbox } from "../../hooks/useStateControlCheckbox";
+import { useAppState } from "../../001_provider/001_AppStateProvider";
 
 export const OpenServerControlCheckbox = "open-server-control-checkbox";
 export const OpenModelSettingCheckbox = "open-model-setting-checkbox";
@@ -20,6 +21,7 @@ export const OpenMergeLabDialogCheckbox = "open-merge-lab-dialog-checkbox";
 export const OpenAdvancedSettingDialogCheckbox = "open-advanced-setting-dialog-checkbox";
 export const OpenGetServerInformationDialogCheckbox = "open-get-server-information-dialog-checkbox";
 export const OpenGetClientInformationDialogCheckbox = "open-get-client-information-dialog-checkbox";
+export const OpenEnablePassThroughDialogCheckbox = "open-enable-pass-through-dialog-checkbox";
 
 export const OpenTextInputDialogCheckbox = "open-text-input-dialog-checkbox";
 export const OpenShowLicenseDialogCheckbox = "open-show-license-dialog-checkbox";
@@ -46,6 +48,7 @@ export type StateControls = {
     showAdvancedSettingCheckbox: StateControlCheckbox;
     showGetServerInformationCheckbox: StateControlCheckbox;
     showGetClientInformationCheckbox: StateControlCheckbox;
+    showEnablePassThroughDialogCheckbox: StateControlCheckbox;
     showTextInputCheckbox: StateControlCheckbox;
     showLicenseCheckbox: StateControlCheckbox;
 };
@@ -59,6 +62,7 @@ type GuiStateAndMethod = {
     setIsAnalyzing: (val: boolean) => void;
     setShowPyTorchModelUpload: (val: boolean) => void;
 
+    reloadDeviceInfo: () => Promise<void>;
     inputAudioDeviceInfo: MediaDeviceInfo[];
     outputAudioDeviceInfo: MediaDeviceInfo[];
     audioInputForGUI: string;
@@ -81,6 +85,12 @@ type GuiStateAndMethod = {
 
     textInputResolve: TextInputResolveType | null;
     setTextInputResolve: (val: TextInputResolveType | null) => void;
+
+    // for Beatrice
+    beatriceJVSSpeakerId: number;
+    beatriceJVSSpeakerPitch: number;
+    setBeatriceJVSSpeakerId: (id: number) => void;
+    setBeatriceJVSSpeakerPitch: (pitch: number) => void;
 };
 
 const GuiStateContext = React.createContext<GuiStateAndMethod | null>(null);
@@ -98,6 +108,7 @@ type TextInputResolveType = {
 
 export const GuiStateProvider = ({ children }: Props) => {
     const { appGuiSettingState } = useAppRoot();
+    const { serverSetting } = useAppState();
     const [isConverting, setIsConverting] = useState<boolean>(false);
     const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
     const [modelSlotNum, setModelSlotNum] = useState<number>(0);
@@ -115,14 +126,23 @@ export const GuiStateProvider = ({ children }: Props) => {
 
     const [textInputResolve, setTextInputResolve] = useState<TextInputResolveType | null>(null);
 
-    const reloadDeviceInfo = async () => {
-        try {
-            const ms = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-            ms.getTracks().forEach((x) => {
-                x.stop();
-            });
-        } catch (e) {
-            console.warn("Enumerate device error::", e);
+    const [beatriceJVSSpeakerId, setBeatriceJVSSpeakerId] = useState<number>(1);
+    const [beatriceJVSSpeakerPitch, setBeatriceJVSSpeakerPitch] = useState<number>(0);
+
+    const checkDeviceAvailable = useRef<boolean>(false);
+
+    const _reloadDeviceInfo = async () => {
+        // デバイスチェックの空振り
+        if (checkDeviceAvailable.current == false) {
+            try {
+                const ms = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+                ms.getTracks().forEach((x) => {
+                    x.stop();
+                });
+                checkDeviceAvailable.current = true;
+            } catch (e) {
+                console.warn("Enumerate device error::", e);
+            }
         }
         const mediaDeviceInfos = await navigator.mediaDevices.enumerateDevices();
 
@@ -169,14 +189,66 @@ export const GuiStateProvider = ({ children }: Props) => {
         // })
         return [audioInputs, audioOutputs];
     };
+
+    const reloadDeviceInfo = async () => {
+        const audioInfo = await _reloadDeviceInfo();
+        setInputAudioDeviceInfo(audioInfo[0]);
+        setOutputAudioDeviceInfo(audioInfo[1]);
+    };
+
+    // useEffect(() => {
+    //     const audioInitialize = async () => {
+    //         await reloadDeviceInfo();
+    //     };
+    //     audioInitialize();
+    // }, []);
+
     useEffect(() => {
-        const audioInitialize = async () => {
-            const audioInfo = await reloadDeviceInfo();
-            setInputAudioDeviceInfo(audioInfo[0]);
-            setOutputAudioDeviceInfo(audioInfo[1]);
+        let isMounted = true;
+
+        // デバイスのポーリングを再帰的に実行する関数
+        const pollDevices = async () => {
+            const checkDeviceDiff = (knownDeviceIds: Set<string>, newDeviceIds: Set<string>) => {
+                const deleted = new Set([...knownDeviceIds].filter((x) => !newDeviceIds.has(x)));
+                const added = new Set([...newDeviceIds].filter((x) => !knownDeviceIds.has(x)));
+                return { deleted, added };
+            };
+            try {
+                const audioInfo = await _reloadDeviceInfo();
+
+                const knownAudioinputIds = new Set(inputAudioDeviceInfo.map((x) => x.deviceId));
+                const newAudioinputIds = new Set(audioInfo[0].map((x) => x.deviceId));
+
+                const knownAudiooutputIds = new Set(outputAudioDeviceInfo.map((x) => x.deviceId));
+                const newAudiooutputIds = new Set(audioInfo[1].map((x) => x.deviceId));
+
+                const audioInputDiff = checkDeviceDiff(knownAudioinputIds, newAudioinputIds);
+                const audioOutputDiff = checkDeviceDiff(knownAudiooutputIds, newAudiooutputIds);
+
+                if (audioInputDiff.deleted.size > 0 || audioInputDiff.added.size > 0) {
+                    console.log(`deleted input device: ${[...audioInputDiff.deleted]}`);
+                    console.log(`added input device: ${[...audioInputDiff.added]}`);
+                    setInputAudioDeviceInfo(audioInfo[0]);
+                }
+                if (audioOutputDiff.deleted.size > 0 || audioOutputDiff.added.size > 0) {
+                    console.log(`deleted output device: ${[...audioOutputDiff.deleted]}`);
+                    console.log(`added output device: ${[...audioOutputDiff.added]}`);
+                    setOutputAudioDeviceInfo(audioInfo[1]);
+                }
+
+                if (isMounted) {
+                    setTimeout(pollDevices, 1000 * 3);
+                }
+            } catch (err) {
+                console.error("An error occurred during enumeration of devices:", err);
+            }
         };
-        audioInitialize();
-    }, []);
+
+        pollDevices();
+        return () => {
+            isMounted = false;
+        };
+    }, [inputAudioDeviceInfo, outputAudioDeviceInfo]);
 
     // (1) Controller Switch
     const openServerControlCheckbox = useStateControlCheckbox(OpenServerControlCheckbox);
@@ -195,6 +267,7 @@ export const GuiStateProvider = ({ children }: Props) => {
     const showAdvancedSettingCheckbox = useStateControlCheckbox(OpenAdvancedSettingDialogCheckbox);
     const showGetServerInformationCheckbox = useStateControlCheckbox(OpenGetServerInformationDialogCheckbox);
     const showGetClientInformationCheckbox = useStateControlCheckbox(OpenGetClientInformationDialogCheckbox);
+    const showEnablePassThroughDialogCheckbox = useStateControlCheckbox(OpenEnablePassThroughDialogCheckbox);
 
     const showTextInputCheckbox = useStateControlCheckbox(OpenTextInputDialogCheckbox);
     const showLicenseCheckbox = useStateControlCheckbox(OpenShowLicenseDialogCheckbox);
@@ -217,6 +290,7 @@ export const GuiStateProvider = ({ children }: Props) => {
         showAdvancedSettingCheckbox.updateState(false);
         showGetServerInformationCheckbox.updateState(false);
         showGetClientInformationCheckbox.updateState(false);
+        showEnablePassThroughDialogCheckbox.updateState(false);
 
         showTextInputCheckbox.updateState(false);
         showLicenseCheckbox.updateState(false);
@@ -238,7 +312,25 @@ export const GuiStateProvider = ({ children }: Props) => {
         setTimeout(show);
     }, [appGuiSettingState.edition]);
 
-    const providerValue = {
+    useEffect(() => {
+        let dstId;
+        if (beatriceJVSSpeakerPitch == 0) {
+            dstId = (beatriceJVSSpeakerId - 1) * 5;
+        } else if (beatriceJVSSpeakerPitch == 1) {
+            dstId = (beatriceJVSSpeakerId - 1) * 5 + 1;
+        } else if (beatriceJVSSpeakerPitch == 2) {
+            dstId = (beatriceJVSSpeakerId - 1) * 5 + 2;
+        } else if (beatriceJVSSpeakerPitch == -1) {
+            dstId = (beatriceJVSSpeakerId - 1) * 5 + 3;
+        } else if (beatriceJVSSpeakerPitch == -2) {
+            dstId = (beatriceJVSSpeakerId - 1) * 5 + 4;
+        } else {
+            throw new Error(`invalid beatriceJVSSpeakerPitch speaker:${beatriceJVSSpeakerId} pitch:${beatriceJVSSpeakerPitch}`);
+        }
+        serverSetting.updateServerSettings({ ...serverSetting.serverSetting, dstId: dstId });
+    }, [beatriceJVSSpeakerId, beatriceJVSSpeakerPitch]);
+
+    const providerValue: GuiStateAndMethod = {
         stateControls: {
             openServerControlCheckbox,
             openModelSettingCheckbox,
@@ -257,6 +349,7 @@ export const GuiStateProvider = ({ children }: Props) => {
             showAdvancedSettingCheckbox,
             showGetServerInformationCheckbox,
             showGetClientInformationCheckbox,
+            showEnablePassThroughDialogCheckbox,
 
             showTextInputCheckbox,
             showLicenseCheckbox,
@@ -291,6 +384,12 @@ export const GuiStateProvider = ({ children }: Props) => {
 
         textInputResolve,
         setTextInputResolve,
+
+        // For Beatrice
+        beatriceJVSSpeakerId,
+        beatriceJVSSpeakerPitch,
+        setBeatriceJVSSpeakerId,
+        setBeatriceJVSSpeakerPitch,
     };
     return <GuiStateContext.Provider value={providerValue}>{children}</GuiStateContext.Provider>;
 };

@@ -1,5 +1,5 @@
 from typing import TypeAlias, Union
-from const import MAX_SLOT_NUM, DiffusionSVCInferenceType, EnumInferenceTypes, EmbedderType, VoiceChangerType
+from const import MAX_SLOT_NUM, MODEL_DIR_STATIC, DiffusionSVCInferenceType, EnumInferenceTypes, EmbedderType, StaticSlot, VoiceChangerType
 
 from dataclasses import dataclass, asdict, field
 
@@ -9,7 +9,7 @@ import json
 
 @dataclass
 class ModelSlot:
-    slotIndex: int = -1
+    slotIndex: int | StaticSlot = -1
     voiceChangerType: VoiceChangerType | None = None
     name: str = ""
     description: str = ""
@@ -39,6 +39,8 @@ class RVCModelSlot(ModelSlot):
 
     sampleId: str = ""
     speakers: dict = field(default_factory=lambda: {0: "target"})
+
+    version: str = "v2"
 
 
 @dataclass
@@ -124,15 +126,49 @@ class DiffusionSVCModelSlot(ModelSlot):
     embChannels: int = 768
 
 
-ModelSlots: TypeAlias = Union[ModelSlot, RVCModelSlot, MMVCv13ModelSlot, MMVCv15ModelSlot, SoVitsSvc40ModelSlot, DDSPSVCModelSlot, DiffusionSVCModelSlot]
+@dataclass
+class BeatriceModelSlot(ModelSlot):
+    voiceChangerType: VoiceChangerType = "Beatrice"
+    modelFile: str = ""
+    dstId: int = 1
+    speakers: dict = field(default_factory=lambda: {1: "user1", 2: "user2"})
 
 
-def loadSlotInfo(model_dir: str, slotIndex: int) -> ModelSlots:
+@dataclass
+class LLVCModelSlot(ModelSlot):
+    voiceChangerType: VoiceChangerType = "LLVC"
+    modelFile: str = ""
+    configFile: str = ""
+
+
+@dataclass
+class EasyVCModelSlot(ModelSlot):
+    voiceChangerType: VoiceChangerType = "EasyVC"
+    modelFile: str = ""
+    version: str = ""
+    samplingRate: int = -1
+
+
+ModelSlots: TypeAlias = Union[
+    ModelSlot,
+    RVCModelSlot,
+    MMVCv13ModelSlot,
+    MMVCv15ModelSlot,
+    SoVitsSvc40ModelSlot,
+    DDSPSVCModelSlot,
+    DiffusionSVCModelSlot,
+    BeatriceModelSlot,
+    LLVCModelSlot,
+    EasyVCModelSlot,
+]
+
+
+def loadSlotInfo(model_dir: str, slotIndex: int | StaticSlot) -> ModelSlots:
     slotDir = os.path.join(model_dir, str(slotIndex))
     jsonFile = os.path.join(slotDir, "params.json")
     if not os.path.exists(jsonFile):
         return ModelSlot()
-    jsonDict = json.load(open(os.path.join(slotDir, "params.json")))
+    jsonDict = json.load(open(jsonFile, encoding="utf-8"))
     slotInfoKey = list(ModelSlot.__annotations__.keys())
     slotInfo = ModelSlot(**{k: v for k, v in jsonDict.items() if k in slotInfoKey})
     if slotInfo.voiceChangerType == "RVC":
@@ -153,6 +189,17 @@ def loadSlotInfo(model_dir: str, slotIndex: int) -> ModelSlots:
     elif slotInfo.voiceChangerType == "Diffusion-SVC":
         slotInfoKey.extend(list(DiffusionSVCModelSlot.__annotations__.keys()))
         return DiffusionSVCModelSlot(**{k: v for k, v in jsonDict.items() if k in slotInfoKey})
+    elif slotInfo.voiceChangerType == "Beatrice":
+        slotInfoKey.extend(list(BeatriceModelSlot.__annotations__.keys()))
+        if slotIndex == "Beatrice-JVS":  # STATIC Model
+            return BeatriceModelSlot(**{k: v for k, v in jsonDict.items() if k in slotInfoKey})
+        return BeatriceModelSlot(**{k: v for k, v in jsonDict.items() if k in slotInfoKey})
+    elif slotInfo.voiceChangerType == "LLVC":
+        slotInfoKey.extend(list(LLVCModelSlot.__annotations__.keys()))
+        return LLVCModelSlot(**{k: v for k, v in jsonDict.items() if k in slotInfoKey})
+    elif slotInfo.voiceChangerType == "EasyVC":
+        slotInfoKey.extend(list(EasyVCModelSlot.__annotations__.keys()))
+        return EasyVCModelSlot(**{k: v for k, v in jsonDict.items() if k in slotInfoKey})
     else:
         return ModelSlot()
 
@@ -163,11 +210,15 @@ def loadAllSlotInfo(model_dir: str):
         slotInfo = loadSlotInfo(model_dir, slotIndex)
         slotInfo.slotIndex = slotIndex  # スロットインデックスは動的に注入
         slotInfos.append(slotInfo)
+
+    slotInfo = loadSlotInfo(MODEL_DIR_STATIC, "Beatrice-JVS")
+    slotInfos.append(slotInfo)
     return slotInfos
 
 
 def saveSlotInfo(model_dir: str, slotIndex: int, slotInfo: ModelSlots):
     slotDir = os.path.join(model_dir, str(slotIndex))
+    print("SlotInfo:::", slotInfo)
     slotInfoDict = asdict(slotInfo)
     slotInfo.slotIndex = -1  # スロットインデックスは動的に注入
     json.dump(slotInfoDict, open(os.path.join(slotDir, "params.json"), "w"), indent=4)

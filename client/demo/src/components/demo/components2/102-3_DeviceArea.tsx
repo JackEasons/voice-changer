@@ -2,14 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAppState } from "../../../001_provider/001_AppStateProvider";
 import { fileSelectorAsDataURL, useIndexedDB } from "@dannadori/voice-changer-client-js";
 import { useGuiState } from "../001_GuiStateProvider";
-import { AUDIO_ELEMENT_FOR_PLAY_MONITOR, AUDIO_ELEMENT_FOR_PLAY_RESULT, AUDIO_ELEMENT_FOR_TEST_CONVERTED, AUDIO_ELEMENT_FOR_TEST_CONVERTED_ECHOBACK, AUDIO_ELEMENT_FOR_TEST_ORIGINAL, INDEXEDDB_KEY_AUDIO_MONITR, INDEXEDDB_KEY_AUDIO_OUTPUT } from "../../../const";
+import { AUDIO_ELEMENT_FOR_PLAY_MONITOR, AUDIO_ELEMENT_FOR_PLAY_RESULT, AUDIO_ELEMENT_FOR_TEST_CONVERTED, AUDIO_ELEMENT_FOR_TEST_CONVERTED_ECHOBACK, INDEXEDDB_KEY_AUDIO_MONITR, INDEXEDDB_KEY_AUDIO_OUTPUT } from "../../../const";
 import { isDesktopApp } from "../../../const";
 
 export type DeviceAreaProps = {};
 
 export const DeviceArea = (_props: DeviceAreaProps) => {
-    const { setting, serverSetting, audioContext, setAudioOutputElementId, setAudioMonitorElementId, initializedRef, setVoiceChangerClientSetting, startOutputRecording, stopOutputRecording } = useAppState();
-    const { isConverting, audioInputForGUI, inputAudioDeviceInfo, setAudioInputForGUI, fileInputEchoback, setFileInputEchoback, setAudioOutputForGUI, setAudioMonitorForGUI, audioOutputForGUI, audioMonitorForGUI, outputAudioDeviceInfo, shareScreenEnabled, setShareScreenEnabled } = useGuiState();
+    const { setting, serverSetting, audioContext, setAudioOutputElementId, setAudioMonitorElementId, initializedRef, setVoiceChangerClientSetting, startOutputRecording, stopOutputRecording, webEdition } = useAppState();
+    const { isConverting, audioInputForGUI, inputAudioDeviceInfo, setAudioInputForGUI, fileInputEchoback, setFileInputEchoback, setAudioOutputForGUI, setAudioMonitorForGUI, audioOutputForGUI, audioMonitorForGUI, outputAudioDeviceInfo, shareScreenEnabled, setShareScreenEnabled, reloadDeviceInfo } = useGuiState();
     const [inputHostApi, setInputHostApi] = useState<string>("ALL");
     const [outputHostApi, setOutputHostApi] = useState<string>("ALL");
     const [monitorHostApi, setMonitorHostApi] = useState<string>("ALL");
@@ -21,6 +21,20 @@ export const DeviceArea = (_props: DeviceAreaProps) => {
 
     // (1) Audio Mode
     const deviceModeRow = useMemo(() => {
+        if (webEdition) {
+            return (
+                <div className="config-sub-area-control">
+                    <div className="config-sub-area-control-title">AUDIO:</div>
+                    <div className="config-sub-area-control-field">
+                        <div className="config-sub-area-buttons">
+                            <div onClick={reloadDeviceInfo} className="config-sub-area-button">
+                                reload
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
         const enableServerAudio = serverSetting.serverSetting.enableServerAudio;
         const clientChecked = enableServerAudio == 1 ? false : true;
         const serverChecked = enableServerAudio == 1 ? true : false;
@@ -62,6 +76,12 @@ export const DeviceArea = (_props: DeviceAreaProps) => {
                                 }}
                             />
                             <label htmlFor="server-device">server</label>
+                        </div>
+
+                        <div className="config-sub-area-buttons">
+                            <div onClick={reloadDeviceInfo} className="config-sub-area-button">
+                                reload
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -389,8 +409,12 @@ export const DeviceArea = (_props: DeviceAreaProps) => {
                         // Server Audio を使う場合はElementから音は出さない。
                         audio.volume = 0;
                     } else if (audioOutputForGUI == "none") {
-                        // @ts-ignore
-                        audio.setSinkId("");
+                        try {
+                            // @ts-ignore
+                            audio.setSinkId("");
+                        } catch (e) {
+                            console.error("catch:" + e);
+                        }
                         if (x == AUDIO_ELEMENT_FOR_TEST_CONVERTED_ECHOBACK) {
                             audio.volume = 0;
                         } else {
@@ -404,8 +428,12 @@ export const DeviceArea = (_props: DeviceAreaProps) => {
                             return x.deviceId == audioOutputForGUI;
                         });
                         if (found) {
-                            // @ts-ignore // 例外キャッチできないので事前にIDチェックが必要らしい。！？
-                            audio.setSinkId(audioOutputForGUI);
+                            try {
+                                // @ts-ignore // 例外キャッチできないので事前にIDチェックが必要らしい。！？
+                                audio.setSinkId(audioOutputForGUI);
+                            } catch (e) {
+                                console.error("catch:" + e);
+                            }
                         } else {
                             console.warn("No audio output device. use default");
                         }
@@ -620,9 +648,13 @@ export const DeviceArea = (_props: DeviceAreaProps) => {
                         // Server Audio を使う場合はElementから音は出さない。
                         audio.volume = 0;
                     } else if (audioMonitorForGUI == "none") {
-                        // @ts-ignore
-                        audio.setSinkId("");
-                        audio.volume = 0;
+                        try {
+                            // @ts-ignore
+                            audio.setSinkId("");
+                            audio.volume = 0;
+                        } catch (e) {
+                            console.error("catch:" + e);
+                        }
                     } else {
                         const audioOutputs = mediaDeviceInfos.filter((x) => {
                             return x.kind == "audiooutput";
@@ -631,9 +663,13 @@ export const DeviceArea = (_props: DeviceAreaProps) => {
                             return x.deviceId == audioMonitorForGUI;
                         });
                         if (found) {
-                            // @ts-ignore // 例外キャッチできないので事前にIDチェックが必要らしい。！？
-                            audio.setSinkId(audioMonitorForGUI);
-                            audio.volume = 1;
+                            try {
+                                // @ts-ignore // 例外キャッチできないので事前にIDチェックが必要らしい。！？
+                                audio.setSinkId(audioMonitorForGUI);
+                                audio.volume = 1;
+                            } catch (e) {
+                                console.error("catch:" + e);
+                            }
                         } else {
                             console.warn("No audio output device. use default");
                         }

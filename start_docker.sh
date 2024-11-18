@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eu
 
-DOCKER_IMAGE=dannadori/vcclient:20230710_031922
+DOCKER_IMAGE=dannadori/vcclient:20230826_211406
 #DOCKER_IMAGE=vcclient
 
 ### DEFAULT VAR ###
@@ -24,6 +24,8 @@ if [ "${USE_GPU}" = "on" ]; then
     -e EX_PORT=${EX_PORT} \
     -e LOCAL_UID=$(id -u $USER) \
     -e LOCAL_GID=$(id -g $USER) \
+    -v `pwd`/docker_folder/model_dir:/voice-changer/server/model_dir \
+    -v `pwd`/docker_folder/pretrain:/voice-changer/server/pretrain \
     -p ${EX_PORT}:18888 \
     $DOCKER_IMAGE -p 18888 --https true \
         --content_vec_500 pretrain/checkpoint_best_legacy_500.pt  \
@@ -45,6 +47,8 @@ else
     -e EX_PORT=${EX_PORT} \
     -e LOCAL_UID=$(id -u $USER) \
     -e LOCAL_GID=$(id -g $USER) \
+    -v `pwd`/docker_folder/model_dir:/voice-changer/server/model_dir \
+    -v `pwd`/docker_folder/pretrain:/voice-changer/server/pretrain \
     -p ${EX_PORT}:18888 \
     $DOCKER_IMAGE -p 18888 --https true \
         --content_vec_500 pretrain/checkpoint_best_legacy_500.pt  \

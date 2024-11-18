@@ -5,6 +5,7 @@ import numpy as np
 
 from const import ServerAudioDeviceType
 from mods.log_control import VoiceChangaerLogger
+
 # from const import SERVER_DEVICE_SAMPLE_RATES
 
 logger = VoiceChangaerLogger.get_instance().getLogger()
@@ -33,12 +34,12 @@ def checkSamplingRate(deviceId: int, desiredSamplingRate: int, type: ServerAudio
                 device=deviceId,
                 callback=dummy_callback,
                 dtype="float32",
-                samplerate=desiredSamplingRate
+                samplerate=desiredSamplingRate,
             ):
                 pass
             return True
-        except Exception as e: # NOQA
-            # print("[checkSamplingRate]", e)
+        except Exception as e:  # NOQA
+            print("[checkSamplingRate]", e)
             return False
     else:
         try:
@@ -46,12 +47,12 @@ def checkSamplingRate(deviceId: int, desiredSamplingRate: int, type: ServerAudio
                 device=deviceId,
                 callback=dummy_callback,
                 dtype="float32",
-                samplerate=desiredSamplingRate
+                samplerate=desiredSamplingRate,
             ):
                 pass
             return True
-        except Exception as e: # NOQA
-            # print("[checkSamplingRate]", e)
+        except Exception as e:  # NOQA
+            print("[checkSamplingRate]", e)
             return False
 
 

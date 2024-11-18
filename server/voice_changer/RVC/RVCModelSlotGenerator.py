@@ -63,7 +63,7 @@ class RVCModelSlotGenerator(ModelSlotGenerator):
             # elif slot.embedder == "hubert_jp":
             #     slot.embedder = "hubert_jp"
             else:
-                raise RuntimeError("[Voice Changer][setInfoByONNX] unknown embedder")
+                raise RuntimeError("[Voice Changer][setInfoByPytorch] unknown embedder")
 
         elif config_len == 18:
             # Original RVC
@@ -154,6 +154,17 @@ class RVCModelSlotGenerator(ModelSlotGenerator):
             slot.samplingRate = metadata["samplingRate"]
             slot.deprecated = False
 
+            if slot.embChannels == 256:
+                if metadata["version"] == "2.1":
+                    slot.version = "v1.1"  # 1.1はclipをonnx内部で実施. realtimeをdisable
+                else:
+                    slot.version = "v1"
+            elif metadata["version"] == "2":
+                slot.version = "v2"
+            elif metadata["version"] == "2.1":  # 2.1はclipをonnx内部で実施. realtimeをdisable
+                slot.version = "v2.1"
+            elif metadata["version"] == "2.2":  # 2.1と同じ
+                slot.version = "v2.2"
         except Exception as e:
             slot.modelType = EnumInferenceTypes.onnxRVC.value
             slot.embChannels = 256

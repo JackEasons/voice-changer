@@ -1,4 +1,5 @@
 from const import EnumInferenceTypes
+from voice_changer.RVC.inferencer.EasyVCInferencerONNX import EasyVCInferencerONNX
 from voice_changer.RVC.inferencer.Inferencer import Inferencer
 from voice_changer.RVC.inferencer.OnnxRVCInferencer import OnnxRVCInferencer
 from voice_changer.RVC.inferencer.OnnxRVCInferencerNono import OnnxRVCInferencerNono
@@ -20,8 +21,9 @@ class InferencerManager:
         inferencerType: EnumInferenceTypes,
         file: str,
         gpu: int,
+        inferencerTypeVersion: str | None = None,
     ) -> Inferencer:
-        cls.currentInferencer = cls.loadInferencer(inferencerType, file, gpu)
+        cls.currentInferencer = cls.loadInferencer(inferencerType, file, gpu, inferencerTypeVersion)
         return cls.currentInferencer
 
     @classmethod
@@ -30,6 +32,7 @@ class InferencerManager:
         inferencerType: EnumInferenceTypes,
         file: str,
         gpu: int,
+        inferencerTypeVersion: str | None = None,
     ) -> Inferencer:
         if inferencerType == EnumInferenceTypes.pyTorchRVC or inferencerType == EnumInferenceTypes.pyTorchRVC.value:
             return RVCInferencer().loadModel(file, gpu)
@@ -40,6 +43,7 @@ class InferencerManager:
         elif inferencerType == EnumInferenceTypes.pyTorchVoRASbeta or inferencerType == EnumInferenceTypes.pyTorchVoRASbeta.value:
             if sys.platform.startswith("darwin") is False:
                 from voice_changer.RVC.inferencer.VorasInferencebeta import VoRASInferencer
+
                 return VoRASInferencer().loadModel(file, gpu)
             else:
                 raise RuntimeError("[Voice Changer] VoRAS is not supported on macOS")
@@ -50,8 +54,11 @@ class InferencerManager:
         elif inferencerType == EnumInferenceTypes.pyTorchWebUINono or inferencerType == EnumInferenceTypes.pyTorchWebUINono.value:
             return WebUIInferencerNono().loadModel(file, gpu)
         elif inferencerType == EnumInferenceTypes.onnxRVC or inferencerType == EnumInferenceTypes.onnxRVC.value:
-            return OnnxRVCInferencer().loadModel(file, gpu)
+            return OnnxRVCInferencer().loadModel(file, gpu, inferencerTypeVersion)
         elif inferencerType == EnumInferenceTypes.onnxRVCNono or inferencerType == EnumInferenceTypes.onnxRVCNono.value:
-            return OnnxRVCInferencerNono().loadModel(file, gpu)
+            return OnnxRVCInferencerNono().loadModel(file, gpu, inferencerTypeVersion)
+        elif inferencerType == EnumInferenceTypes.easyVC or inferencerType == EnumInferenceTypes.easyVC.value:
+            return EasyVCInferencerONNX().loadModel(file, gpu)
+
         else:
             raise RuntimeError("[Voice Changer] Inferencer not found", inferencerType)

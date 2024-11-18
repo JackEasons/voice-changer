@@ -1,10 +1,12 @@
 import React, { useMemo } from "react";
 import { useGuiState } from "../001_GuiStateProvider";
+import { useAppState } from "../../../001_provider/001_AppStateProvider";
 
 export type MoreActionAreaProps = {};
 
 export const MoreActionArea = (_props: MoreActionAreaProps) => {
     const { stateControls } = useGuiState();
+    const { webEdition } = useAppState();
 
     const serverIORecorderRow = useMemo(() => {
         const onOpenMergeLabClicked = () => {
@@ -44,5 +46,9 @@ export const MoreActionArea = (_props: MoreActionAreaProps) => {
         );
     }, [stateControls]);
 
-    return <div className="config-sub-area">{serverIORecorderRow}</div>;
+    if (webEdition) {
+        return <> </>;
+    } else {
+        return <div className="config-sub-area">{serverIORecorderRow}</div>;
+    }
 };

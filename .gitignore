@@ -36,6 +36,11 @@ server/memo.md
 
 client/lib/dist
 client/lib/worklet/dist
+client/demo/public/models
+client/demo/public/models_
+client/demo/dist/models
+client/demo/dist_web
+client/demo/src/001_provider/backup
 # client/demo/dist/ # demo用に残す
 
 docker/cudnn/
@@ -53,11 +58,20 @@ server/samples_0003_o.json
 server/samples_0003_t2.json
 server/samples_0003_o2.json
 server/samples_0003_d2.json
+server/samples_0004_t.json
+server/samples_0004_o.json
+server/samples_0004_d.json
 
 server/test_official_v1_v2.json
 server/test_ddpn_v1_v2.json
-server/vvclient.log
+server/vcclient.log
 start_trainer.sh
 
 # venv
 venv/
+
+
+beatrice_internal_api.cp310-win_amd64.pyd
+108_average_110b_10.bin
+
+server/model_dir_static/Beatrice-JVS

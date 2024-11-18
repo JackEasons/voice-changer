@@ -1,6 +1,6 @@
-# Realtime Voice Changer Client for RVC Tutorial (v.1.5.3.7)
+# Realtime Voice Changer Client for RVC Tutorial (v.1.5.3.13)
 
-[Japanese/日本語](/tutorials/tutorial_rvc_ja_latest.md)
+[Japanese/日本語](/tutorials/tutorial_rvc_ja_latest.md) [Korean/한국어](/tutorials/tutorial_rvc_ko_latest.md)
 
 # Introduction
 
@@ -125,7 +125,7 @@ Icons are links.
 | <img src="https://github.com/w-okada/rvc-trainer-docker/assets/48346627/7bc188db-3aae-43eb-98a1-34aacc16173d" width="32"> spanner  | tools             |
 | <img src="https://github.com/w-okada/rvc-trainer-docker/assets/48346627/5db16acc-e901-40d2-8fc2-1fb9fd67f59c" width="32"> coffee   | donation          |
 
-### claer setting
+### clear setting
 
 Initialize configuration.
 
@@ -139,7 +139,7 @@ By pressing the "edit" button, you can edit the list of models (model slots). Pl
 
 ## Main Control
 
-![image](https://github.com/w-okada/voice-changer/assets/48346627/5a8dcf64-29d3-49cd-92f1-db7b539bfb3d)
+![image](https://github.com/w-okada/voice-changer/assets/48346627/4401acdb-eb58-40e1-9609-5a82ee5eb570)
 
 A character image loaded on the left side will be displayed. The status of real-time voice changer is overlaid on the top left of the character image.
 
@@ -166,6 +166,12 @@ The time it takes to convert data with CHUNK and EXTRA added is measured. Decrea
 #### start/stop button
 
 Press "start" to begin voice conversion and "stop" to end it.
+
+#### pass through button
+
+When this button is pressed, the sound inputted will be outputted as is.
+
+The sound inputted will be outputted as is.. By default, a confirmation dialog will appear when it's activated, but you can skip this dialog through the Advanced Settings.
 
 #### GAIN
 
@@ -247,12 +253,24 @@ You can select the GPU to use in the onnxgpu version.
 
 In the onnxdirectML version, you can switch the GPU ON/OFF.
 
+On DirectML Version, these buottns is displayed.
+
+![image](https://github.com/w-okada/voice-changer/assets/48346627/5a66f237-e5b5-4819-9409-ff5eebb6e514)
+
+- cpu: use cpu
+- gpu0: use gpu0
+- gpu1: use gpu1
+- gpu2: use gpu2
+- gpu3: use gpu3
+
+Even if a GPU is not detected, gpu0 - gpu3 will still be displayed. If you specify a GPU that doesn't exist, the CPU will be used instead.[reference](https://github.com/w-okada/voice-changer/issues/410)
+
 #### AUDIO
 
-Choose the type of audio device you want to use. For more information, please refer to the [document](./tutorial_device_mode.md).
+Choose the type of audio device you want to use. For more information, please refer to the [document](./tutorial_device_mode_ja.md).
 
 - Client: You can make use of the microphone input and speaker output with the GUI functions such as noise cancellation.
-- Server: VCClient can directly control the microphone and speaker to minimize latency.
+- Server: VC Client can directly control the microphone and speaker to minimize latency.
 
 #### input
 

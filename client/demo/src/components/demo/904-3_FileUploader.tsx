@@ -111,6 +111,25 @@ export const FileUploaderScreen = (props: FileUploaderScreenProps) => {
                     return x.kind == "diffusionSVCModel";
                 });
                 return enough;
+            } else if (setting.voiceChangerType == "Beatrice") {
+                const enough = !!setting.files.find((x) => {
+                    return x.kind == "beatriceModel";
+                });
+                return enough;
+            } else if (setting.voiceChangerType == "LLVC") {
+                const enough =
+                    !!setting.files.find((x) => {
+                        return x.kind == "llvcModel";
+                    }) &&
+                    !!setting.files.find((x) => {
+                        return x.kind == "llvcConfig";
+                    });
+                return enough;
+            } else if (setting.voiceChangerType == "EasyVC") {
+                const enough = !!setting.files.find((x) => {
+                    return x.kind == "easyVCModel";
+                });
+                return enough;
             }
             return false;
         };
@@ -170,6 +189,13 @@ export const FileUploaderScreen = (props: FileUploaderScreenProps) => {
                 rows.push(generateFileRow(uploadSetting!, "Model(diff)", "ddspSvcDiffusion", ["pth", "pt"], "diff/"));
             } else if (vcType == "Diffusion-SVC") {
                 rows.push(generateFileRow(uploadSetting!, "Model(combo)", "diffusionSVCModel", ["ptc"]));
+            } else if (vcType == "Beatrice") {
+                rows.push(generateFileRow(uploadSetting!, "Beatrice", "beatriceModel", ["bin"]));
+            } else if (vcType == "LLVC") {
+                rows.push(generateFileRow(uploadSetting!, "Model", "llvcModel", ["pth"]));
+                rows.push(generateFileRow(uploadSetting!, "Config", "llvcConfig", ["json"]));
+            } else if (vcType == "EasyVC") {
+                rows.push(generateFileRow(uploadSetting!, "Model", "easyVCModel", ["onnx"]));
             }
             return rows;
         };

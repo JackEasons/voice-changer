@@ -10,7 +10,7 @@ from voice_changer.Local.ServerDevice import ServerDevice, ServerDeviceCallbacks
 from voice_changer.ModelSlotManager import ModelSlotManager
 from voice_changer.RVC.RVCModelMerger import RVCModelMerger
 from voice_changer.VoiceChanger import VoiceChanger
-from const import STORED_SETTING_FILE, UPLOAD_DIR
+from const import STORED_SETTING_FILE, UPLOAD_DIR, StaticSlot
 from voice_changer.VoiceChangerV2 import VoiceChangerV2
 from voice_changer.utils.LoadModelParams import LoadModelParamFile, LoadModelParams
 from voice_changer.utils.ModelMerger import MergeElement, ModelMergerRequest
@@ -22,7 +22,7 @@ import torch
 # import threading
 from typing import Callable
 from typing import Any
-
+import re
 
 logger = VoiceChangaerLogger.get_instance().getLogger()
 
@@ -36,15 +36,15 @@ class GPUInfo:
 
 @dataclass()
 class VoiceChangerManagerSettings:
-    modelSlotIndex: int = -1
+    modelSlotIndex: int | StaticSlot = -1
     passThrough: bool = False  # 0: off, 1: on
     # ↓mutableな物だけ列挙
-    boolData: list[str] = field(default_factory=lambda: [
-        "passThrough"
-    ])
-    intData: list[str] = field(default_factory=lambda: [
-        "modelSlotIndex",
-    ])
+    boolData: list[str] = field(default_factory=lambda: ["passThrough"])
+    intData: list[str] = field(
+        default_factory=lambda: [
+            "modelSlotIndex",
+        ]
+    )
 
 
 class VoiceChangerManager(ServerDeviceCallbacks):
@@ -72,6 +72,7 @@ class VoiceChangerManager(ServerDeviceCallbacks):
     # VoiceChangerManager
     ############################
     def __init__(self, params: VoiceChangerParams):
+        logger.info("[Voice Changer] VoiceChangerManager initializing...")
         self.params = params
         self.voiceChanger: VoiceChanger = None
         self.settings: VoiceChangerManagerSettings = VoiceChangerManagerSettings()
@@ -95,6 +96,7 @@ class VoiceChangerManager(ServerDeviceCallbacks):
             self.update_settings("gpu", 0)
         # for key, val in self.stored_setting.items():
         #     self.update_settings(key, val)
+        logger.info("[Voice Changer] VoiceChangerManager initializing... done.")
 
     def store_setting(self, key: str, val: str | int | float):
         saveItemForServerDevice = ["enableServerAudio", "serverAudioSampleRate", "serverInputDeviceId", "serverOutputDeviceId", "serverMonitorDeviceId", "serverReadChunkSize", "serverInputAudioGain", "serverOutputAudioGain"]
@@ -140,6 +142,13 @@ class VoiceChangerManager(ServerDeviceCallbacks):
         else:
             # アップローダ
             # ファイルをslotにコピー
+            slotDir = os.path.join(
+                self.params.model_dir,
+                str(params.slot),
+            )
+            if os.path.isdir(slotDir):
+                shutil.rmtree(slotDir)
+
             for file in params.files:
                 logger.info(f"FILE: {file}")
                 srcPath = os.path.join(UPLOAD_DIR, file.dir, file.name)
@@ -185,6 +194,24 @@ class VoiceChangerManager(ServerDeviceCallbacks):
 
                 slotInfo = DiffusionSVCModelSlotGenerator.loadModel(params)
                 self.modelSlotManager.save_model_slot(params.slot, slotInfo)
+            elif params.voiceChangerType == "Beatrice":
+                from voice_changer.Beatrice.BeatriceModelSlotGenerator import BeatriceModelSlotGenerator
+
+                slotInfo = BeatriceModelSlotGenerator.loadModel(params)
+                self.modelSlotManager.save_model_slot(params.slot, slotInfo)
+
+            elif params.voiceChangerType == "LLVC":
+                from voice_changer.LLVC.LLVCModelSlotGenerator import LLVCModelSlotGenerator
+
+                slotInfo = LLVCModelSlotGenerator.loadModel(params)
+                self.modelSlotManager.save_model_slot(params.slot, slotInfo)
+
+            elif params.voiceChangerType == "EasyVC":
+                from voice_changer.EasyVC.EasyVCModelSlotGenerator import EasyVCModelSlotGenerator
+
+                slotInfo = EasyVCModelSlotGenerator.loadModel(params)
+                self.modelSlotManager.save_model_slot(params.slot, slotInfo)
+
             logger.info(f"params, {params}")
 
     def get_info(self):
@@ -213,7 +240,7 @@ class VoiceChangerManager(ServerDeviceCallbacks):
         else:
             return {"status": "ERROR", "msg": "no model loaded"}
 
-    def generateVoiceChanger(self, val: int):
+    def generateVoiceChanger(self, val: int | StaticSlot):
         slotInfo = self.modelSlotManager.get_slot_info(val)
         if slotInfo is None:
             logger.info(f"[Voice Changer] model slot is not found {val}")
@@ -267,6 +294,34 @@ class VoiceChangerManager(ServerDeviceCallbacks):
             self.voiceChangerModel = DiffusionSVC(self.params, slotInfo)
             self.voiceChanger = VoiceChangerV2(self.params)
             self.voiceChanger.setModel(self.voiceChangerModel)
+        elif slotInfo.voiceChangerType == "Beatrice":
+            logger.info("................Beatrice")
+            from voice_changer.Beatrice.Beatrice import Beatrice
+
+            if val == "Beatrice-JVS":
+                self.voiceChangerModel = Beatrice(self.params, slotInfo, static=True)
+            else:
+                self.voiceChangerModel = Beatrice(self.params, slotInfo)
+            self.voiceChanger = VoiceChangerV2(self.params)
+            self.voiceChanger.setModel(self.voiceChangerModel)
+        elif slotInfo.voiceChangerType == "LLVC":
+            logger.info("................LLVC")
+            from voice_changer.LLVC.LLVC import LLVC
+
+            self.voiceChangerModel = LLVC(self.params, slotInfo)
+            self.voiceChanger = VoiceChangerV2(self.params)
+            self.voiceChanger.setModel(self.voiceChangerModel)
+            pass
+
+        elif slotInfo.voiceChangerType == "EasyVC":
+            logger.info("................EasyVC")
+            from voice_changer.EasyVC.EasyVC import EasyVC
+
+            self.voiceChangerModel = EasyVC(self.params, slotInfo)
+            self.voiceChanger = VoiceChangerV2(self.params)
+            self.voiceChanger.setModel(self.voiceChangerModel)
+            pass
+
         else:
             logger.info(f"[Voice Changer] unknown voice changer model: {slotInfo.voiceChangerType}")
             if hasattr(self, "voiceChangerModel"):
@@ -283,15 +338,20 @@ class VoiceChangerManager(ServerDeviceCallbacks):
                 newVal = False
             setattr(self.settings, key, newVal)
         elif key in self.settings.intData:
-            newVal = int(val)
             if key == "modelSlotIndex":
-                newVal = newVal % 1000
+                try:
+                    newVal = int(val)
+                    newVal = newVal % 1000
+                except:
+                    newVal = re.sub("^\d+", "", val)  # 先頭の数字を取り除く。
                 logger.info(f"[Voice Changer] model slot is changed {self.settings.modelSlotIndex} -> {newVal}")
                 self.generateVoiceChanger(newVal)
                 # キャッシュ設定の反映
                 for k, v in self.stored_setting.items():
                     if k != "modelSlotIndex":
                         self.update_settings(k, v)
+            else:
+                newVal = int(val)
 
             setattr(self.settings, key, newVal)
 
@@ -319,7 +379,7 @@ class VoiceChangerManager(ServerDeviceCallbacks):
         req = json.loads(request)
         req = ModelMergerRequest(**req)
         req.files = [MergeElement(**f) for f in req.files]
-        slot = len(self.modelSlotManager.getAllSlotInfo()) - 1
+        slot = len(self.modelSlotManager.getAllSlotInfo()) - 2  #  Beatrice-JVS が追加されたので -1 -> -2
         if req.voiceChangerType == "RVC":
             merged = RVCModelMerger.merge_models(self.params, req, slot)
             loadParam = LoadModelParams(voiceChangerType="RVC", slot=slot, isSampleMode=False, sampleId="", files=[LoadModelParamFile(name=os.path.basename(merged), kind="rvcModel", dir="")], params={})
